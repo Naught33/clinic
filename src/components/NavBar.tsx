@@ -6,26 +6,20 @@ export function NavBar() {
   const { user } = useAuth();
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-white px-6 dark:border-line-dark dark:bg-paper-dark">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded bg-ink text-[13px] font-bold text-white dark:bg-white dark:text-ink">
-          C
-        </span>
-        <span className="font-display text-xl font-extrabold tracking-tight text-ink dark:text-white">
-          Clinic-O
-        </span>
+    <header className="navbar">
+      <div className="navbar__brand">
+        <span className="navbar__logo">C</span>
+        <span className="navbar__title">Clinic-O</span>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="navbar__right">
         <ThemeToggle />
-        <div className="flex items-center gap-2.5">
-          <div className="hidden text-right sm:block">
-            <p className="text-sm font-semibold leading-tight text-ink dark:text-white">
+        <div className="navbar__user">
+          <div className="navbar__user-meta">
+            <p className="navbar__user-name">
               {user ? `${user.firstName} ${user.lastName}` : "Guest"}
             </p>
-            <p className="text-[12px] leading-tight text-ink-soft dark:text-surface/60">
-              {user?.email ?? ""}
-            </p>
+            <p className="navbar__user-email">{user?.email ?? ""}</p>
           </div>
           <Avatar src={user?.image} name={user?.firstName} size={38} />
         </div>

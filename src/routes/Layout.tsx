@@ -4,11 +4,11 @@ import { SideNav } from "../components/SideNav";
 
 export default function Layout() {
   return (
-    <div className="flex h-screen flex-col bg-surface dark:bg-paper-dark">
+    <div className="app-shell">
       <NavBar />
-      <div className="flex min-h-0 flex-1">
+      <div className="app-shell__content">
         <SideNav />
-        <main className="min-w-0 flex-1 overflow-y-auto p-6">
+        <main className="app-shell__main">
           <Outlet />
         </main>
       </div>

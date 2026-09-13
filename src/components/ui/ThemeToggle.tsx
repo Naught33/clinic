@@ -12,13 +12,9 @@ export function ThemeToggle() {
       role="switch"
       aria-checked={isDark}
       aria-label="Toggle dark mode"
-      className="relative inline-flex h-8 w-14 shrink-0 items-center rounded-full border border-line bg-surface transition-colors dark:border-line-dark dark:bg-surface-dark"
+      className="theme-toggle"
     >
-      <span
-        className={`absolute top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-ink shadow-panel transition-transform duration-200 dark:bg-ink dark:text-white ${
-          isDark ? "translate-x-[26px]" : "translate-x-0.5"
-        }`}
-      >
+      <span className="theme-toggle__thumb">
         <Icon name={isDark ? "moon" : "sun"} size={13} />
       </span>
     </button>

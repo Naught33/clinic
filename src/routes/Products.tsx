@@ -41,21 +41,21 @@ export default function Products() {
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   return (
-    <div className="flex gap-6">
-      <div className="min-w-0 flex-1 space-y-5">
-        <form onSubmit={handleSearch} className="flex gap-2">
+    <div className="products">
+      <div className="products__list">
+        <form onSubmit={handleSearch} className="products__search">
           <Input
             icon="search"
             placeholder="Medicrill"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Button type="submit" size="md" className="px-4" aria-label="Search products">
+          <Button type="submit" size="md" aria-label="Search products">
             <Icon name="search" size={16} />
           </Button>
         </form>
 
-        <Card className="p-4">
+        <Card className="products__filter">
           {categories.status === "success" && (
             <CategorySelector
               categories={categories.data}
@@ -87,33 +87,25 @@ export default function Products() {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="product-grid">
               {list.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setPreviewId(p.id)}
-                  className={`group flex flex-col overflow-hidden rounded-md border bg-white text-left transition-colors dark:bg-[#161A18] ${
-                    previewId === p.id
-                      ? "border-clinic-green/50 ring-1 ring-clinic-green/30"
-                      : "border-line hover:border-ink/20 dark:border-line-dark dark:hover:border-white/20"
-                  }`}
+                  className={`product-card${previewId === p.id ? " product-card--open" : ""}`}
                 >
-                  <div className="flex aspect-square items-center justify-center bg-surface text-ink-soft/40 dark:bg-surface-dark">
+                  <div className="product-card__thumb">
                     {p.thumbnail ? (
-                      <img src={p.thumbnail} alt={p.title} className="h-full w-full object-cover" />
+                      <img src={p.thumbnail} alt={p.title} className="product-card__img" />
                     ) : (
                       <Icon name="image" size={28} />
                     )}
                   </div>
-                  <div className="space-y-0.5 p-3">
-                    <p className="truncate text-sm font-medium text-ink dark:text-white">{p.title}</p>
-                    <p className="font-mono text-[13px] font-semibold text-ink dark:text-white">
-                      $ {p.price?.toFixed(2) ?? "—"}
-                    </p>
-                    <p className="text-[12px] text-ink-soft dark:text-surface/60">
-                      {p.stock} left
-                    </p>
+                  <div className="product-card__body">
+                    <p className="product-card__title">{p.title}</p>
+                    <p className="product-card__price">$ {p.price?.toFixed(2) ?? "—"}</p>
+                    <p className="product-card__stock">{p.stock} left</p>
                   </div>
                 </button>
               ))}

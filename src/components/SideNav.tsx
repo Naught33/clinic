@@ -18,19 +18,13 @@ export function SideNav() {
   }
 
   return (
-    <nav className="flex h-full w-60 shrink-0 flex-col justify-between border-r border-line bg-white p-4 dark:border-line-dark dark:bg-paper-dark">
-      <ul className="space-y-1">
+    <nav className="sidenav">
+      <ul className="sidenav__list">
         {NAV_ITEMS.map((item) => (
           <li key={item.to}>
             <NavLink
               to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-ink text-white dark:bg-white dark:text-ink"
-                    : "text-ink-soft hover:bg-surface hover:text-ink dark:text-surface/70 dark:hover:bg-surface-dark dark:hover:text-white"
-                }`
-              }
+              className={({ isActive }) => `sidenav__link${isActive ? " is-active" : ""}`}
             >
               <Icon name={item.icon} size={17} />
               {item.label}
@@ -39,11 +33,7 @@ export function SideNav() {
         ))}
       </ul>
 
-      <button
-        type="button"
-        onClick={handleSignOut}
-        className="flex items-center gap-2.5 rounded bg-clinic-red px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-clinic-red/90"
-      >
+      <button type="button" onClick={handleSignOut} className="sidenav__signout">
         <Icon name="power" size={17} />
         Sign Out
       </button>

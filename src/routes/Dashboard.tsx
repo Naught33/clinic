@@ -37,11 +37,11 @@ export default function Dashboard() {
   const totalCategories = categories.status === "success" ? categories.data.length : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+    <div className="dashboard">
+      <div className="dashboard__stats-row">
         <StatCard value={totalItems ?? "—"} label="Total Items" />
         <StatCard value={totalCategories ?? "—"} label="Total Categories" accent />
-        <div className="flex flex-[1.4] items-center">
+        <div className="dashboard__search">
           <Input
             icon="search"
             placeholder="Medicrill"
@@ -54,10 +54,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Card className="p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-ink dark:text-white">Stock Informatics</h2>
-          <div className="flex items-center gap-2">
+      <Card className="dash-card">
+        <div className="dashboard-card__head">
+          <h2 className="dashboard-card__title">Stock Informatics</h2>
+          <div className="dashboard-card__controls">
             <Select
               value={order}
               onChange={(e) => {
@@ -92,41 +92,34 @@ export default function Dashboard() {
             description="Try a different search term or raise the stock threshold."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="dash-table-wrap">
+            <table className="dash-table">
               <thead>
-                <tr className="border-b border-line text-[13px] text-ink-soft dark:border-line-dark dark:text-surface/60">
-                  <th className="py-2 pr-4 font-medium">id</th>
-                  <th className="py-2 pr-4 font-medium">Title</th>
-                  <th className="py-2 pr-4 font-medium">Stock</th>
-                  <th className="py-2 pr-4 font-medium" />
+                <tr>
+                  <th>id</th>
+                  <th>Title</th>
+                  <th>Stock</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {pageItems.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-line last:border-0 dark:border-line-dark"
-                  >
-                    <td className="py-2.5 pr-4 font-mono text-[13px] text-ink-soft dark:text-surface/60">
-                      {p.id}
-                    </td>
-                    <td className="py-2.5 pr-4 font-medium text-ink dark:text-white">{p.title}</td>
-                    <td className="py-2.5 pr-4">
+                  <tr key={p.id}>
+                    <td className="dash-table__id">{p.id}</td>
+                    <td className="dash-table__title">{p.title}</td>
+                    <td>
                       <span
-                        className={`font-mono text-[13px] font-medium ${
-                          p.stock < 5
-                            ? "text-clinic-red"
-                            : "text-clinic-green dark:text-clinic-green-dark"
+                        className={`dash-table__value ${
+                          p.stock < 5 ? "dash-table__value--low" : "dash-table__value--ok"
                         }`}
                       >
                         {p.stock}
                       </span>
                     </td>
-                    <td className="py-2.5 pr-4 text-right">
+                    <td className="dash-table__actions">
                       <Link
                         to={`/products/${p.id}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-ink-soft transition-colors hover:bg-surface hover:text-ink dark:text-surface/60 dark:hover:bg-surface-dark dark:hover:text-white"
+                        className="dash-table__edit"
                         aria-label={`Edit ${p.title}`}
                       >
                         <Icon name="edit" size={15} />
@@ -139,7 +132,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-4">
+        <div className="dash-table__pager">
           <Pagination
             page={page}
             totalPages={totalPages}
