@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useCategories, useProducts } from "../lib/hooks";
+import { debugEvents } from "../lib/client";
+import { useToast } from "../components/ui/Toast";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { Select } from "../components/ui/Select";
@@ -8,12 +10,17 @@ import { CategorySelector } from "../components/ui/CategoryPill";
 import { Card } from "../components/ui/Card";
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
 import { Icon } from "../components/ui/Icon";
 import { GridSkeleton } from "../components/ui/Skeleton";
 import { ProductModal } from "../components/ProductModal";
 
 const PAGE_SIZE = 10;
 const SEARCH_DELAY = 350;
+
+/** Debug slow-mo (VITE_DEBUG_REQUEST_DELAY=true): pad product-list requests. */
+const DEBUG_REQUEST_DELAY = import.meta.env.VITE_DEBUG_REQUEST_DELAY === "true";
+const REQUEST_DELAY_MS = 2000;
 
 type SortBy = "" | "title" | "price" | "stock";
 type Order = "asc" | "desc";
@@ -27,7 +34,7 @@ function parsePositiveInt(value: string | null, fallback: number): number {
  * The whole page state lives in the URL query string so a filtered/paginated
  * result set can be shared, reloaded, or restored after a session expiry:
  *
- *   /products?q=vit&categories=beauty,skin-care&sortBy=price&order=asc&page=2
+ *   /products?q=vit&categories=beauty,skin-care&sortBy=price&order=asc&page=2&preview=19
  *
  * The URL is the single source of truth for everything except the search
  * text box, which stays local so typing is instant (it commits to the URL
@@ -36,6 +43,7 @@ function parsePositiveInt(value: string | null, fallback: number): number {
 export default function Products() {
   const categories = useCategories();
   const navigate = useNavigate();
+  const { notify } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlQuery = searchParams.get("q") ?? "";
@@ -44,8 +52,11 @@ export default function Products() {
   const sortBy: SortBy = (searchParams.get("sortBy") ?? "") as SortBy;
   const order: Order = searchParams.get("order") === "desc" ? "desc" : "asc";
 
+  const previewRaw = searchParams.get("preview");
+  const previewId =
+    previewRaw && Number.isFinite(Number(previewRaw)) ? Number(previewRaw) : undefined;
+
   const [searchInput, setSearchInput] = useState(urlQuery);
-  const [previewId, setPreviewId] = useState<number | undefined>(undefined);
 
   // Back/forward: resync the text box with the committed URL term.
   const [prevUrlQuery, setPrevUrlQuery] = useState(urlQuery);
@@ -54,7 +65,10 @@ export default function Products() {
     setSearchInput(urlQuery);
   }
 
-  function updateParams(patch: Record<string, string | number | undefined>, opts?: { replace?: boolean }) {
+  function updateParams(
+    patch: Record<string, string | number | undefined>,
+    opts?: { replace?: boolean },
+  ) {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined || value === "") next.delete(key);
@@ -65,14 +79,30 @@ export default function Products() {
   }
 
   // Debounced as-you-type search: commit the term (and reset page) to URL.
-  // `replace` keeps intermediate keystrokes out of browser history.
+  // `replace` keeps intermediate keystrokes out of browser history. The page
+  // only resets when the term actually changed — if it already matches the
+  // committed URL the box is echoing a reload/back-nav, and resetting page
+  // there is what used to bounce reloads back to page 1.
   useEffect(() => {
     const id = setTimeout(() => {
-      updateParams({ q: searchInput.trim() || undefined, page: 1 }, { replace: true });
+      const trimmed = searchInput.trim();
+      if (trimmed === urlQuery) {
+        updateParams({ q: trimmed || undefined }, { replace: true });
+      } else {
+        updateParams({ q: trimmed || undefined, page: 1 }, { replace: true });
+      }
     }, SEARCH_DELAY);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
+
+  // Surfaced the debug slow-mo as a toast the moment a delayed request fires.
+  useEffect(() => {
+    if (!DEBUG_REQUEST_DELAY) return;
+    return debugEvents.on("debug:request-delay", (payload) => {
+      notify({ variant: "info", title: "Debug slow-mo", description: payload.message });
+    });
+  }, [notify]);
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -105,6 +135,7 @@ export default function Products() {
     order,
     limit: PAGE_SIZE,
     skip: (page - 1) * PAGE_SIZE,
+    delay: DEBUG_REQUEST_DELAY ? REQUEST_DELAY_MS : undefined,
   });
 
   const list = products.status === "success" ? products.data.products : [];
@@ -162,10 +193,11 @@ export default function Products() {
         {products.status === "loading" || products.status === "idle" ? (
           <GridSkeleton count={8} />
         ) : products.status === "error" ? (
-          <EmptyState
-            icon="alert"
+          <ErrorState
             title="Couldn't load products"
-            description={products.error.message}
+            code={products.error.status}
+            message={products.error.message}
+            onRetry={() => products.refetch(true)}
           />
         ) : list.length === 0 ? (
           <EmptyState
@@ -179,7 +211,7 @@ export default function Products() {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => setPreviewId(p.id)}
+                  onClick={() => updateParams({ preview: p.id })}
                   className={`product-card${previewId === p.id ? " product-card--open" : ""}`}
                 >
                   <div className="product-card__thumb">
@@ -211,7 +243,7 @@ export default function Products() {
       {previewId !== undefined && (
         <ProductModal
           id={previewId}
-          onClose={() => setPreviewId(undefined)}
+          onClose={() => updateParams({ preview: undefined })}
           onExpand={() => navigate(`/products/${previewId}`)}
         />
       )}

@@ -22,9 +22,7 @@ export default function Auth() {
       success("Welcome back", `Signed in as ${user.firstName} ${user.lastName}`);
       const snapshot = getSessionSnapshot();
       clearSessionSnapshot();
-      navigate(snapshot?.page ? location.state?.from ?? "/dashboard" : location.state?.from ?? "/dashboard", {
-        replace: true,
-      });
+      navigate(snapshot?.path ?? location.state?.from ?? "/dashboard", { replace: true });
     } else {
       toastError("Sign in failed", "Check your username and password and try again.");
     }

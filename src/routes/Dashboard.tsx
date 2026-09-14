@@ -8,6 +8,7 @@ import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
 import { Icon } from "../components/ui/Icon";
 import { StatSkeleton, TableSkeleton } from "../components/ui/Skeleton";
 import { StockEditModal } from "../components/StockEditModal";
@@ -45,9 +46,11 @@ export default function Dashboard() {
   const page = parsePositiveInt(searchParams.get("page"), 1);
 
   const [search, setSearch] = useState(urlQuery);
-  const [stockTarget, setStockTarget] = useState<{ id: number; title: string; stock: number } | null>(
-    null,
-  );
+  const [stockTarget, setStockTarget] = useState<{
+    id: number;
+    title: string;
+    stock: number;
+  } | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Back/forward: resync the text box with the committed URL term.
@@ -57,7 +60,10 @@ export default function Dashboard() {
     setSearch(urlQuery);
   }
 
-  function updateParams(patch: Record<string, string | number | undefined>, opts?: { replace?: boolean }) {
+  function updateParams(
+    patch: Record<string, string | number | undefined>,
+    opts?: { replace?: boolean },
+  ) {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined || value === "") next.delete(key);
@@ -69,16 +75,23 @@ export default function Dashboard() {
 
   // Debounced as-you-type search: the dashboard filters its cached list
   // instantly; the URL only gets the committed term. `replace` keeps
-  // intermediate keystrokes out of browser history.
+  // intermediate keystrokes out of browser history. Page only resets when
+  // the term actually changed — see Products.tsx for the reload rationale.
   useEffect(() => {
     const id = setTimeout(() => {
-      updateParams({ q: search.trim() || undefined, page: 1 }, { replace: true });
+      const trimmed = search.trim();
+      if (trimmed === urlQuery) {
+        updateParams({ q: trimmed || undefined }, { replace: true });
+      } else {
+        updateParams({ q: trimmed || undefined, page: 1 }, { replace: true });
+      }
     }, SEARCH_DELAY);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const { lowStock, status, refetch } = useLowStockProducts(threshold, order);
+  const stockLevels = useLowStockProducts(threshold, order);
+  const { lowStock, status, refetch } = stockLevels;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -140,9 +153,7 @@ export default function Dashboard() {
           <div className="dashboard-card__controls">
             <Select
               value={order}
-              onChange={(e) =>
-                updateParams({ order: e.target.value as "asc" | "desc", page: 1 })
-              }
+              onChange={(e) => updateParams({ order: e.target.value as "asc" | "desc", page: 1 })}
             >
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
@@ -162,6 +173,13 @@ export default function Dashboard() {
 
         {status === "loading" || status === "idle" ? (
           <TableSkeleton />
+        ) : stockLevels.status === "error" ? (
+          <ErrorState
+            title="Couldn't load stock levels"
+            code={stockLevels.error.status}
+            message={stockLevels.error.message}
+            onRetry={() => stockLevels.refetch(true)}
+          />
         ) : filtered.length === 0 ? (
           <EmptyState
             title="No matching products"

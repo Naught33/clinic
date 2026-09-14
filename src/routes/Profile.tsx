@@ -3,7 +3,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Skeleton } from "../components/ui/Skeleton";
-import { EmptyState } from "../components/ui/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
 
 export default function Profile() {
   const profile = useProfile();
@@ -32,15 +32,11 @@ export default function Profile() {
 
   if (profile.status === "error") {
     return (
-      <EmptyState
-        icon="alert"
+      <ErrorState
         title="Couldn't load your profile"
-        description={profile.error.message}
-        action={
-          <Button variant="secondary" size="sm" onClick={() => profile.refetch()}>
-            Retry
-          </Button>
-        }
+        code={profile.error.status}
+        message={profile.error.message}
+        onRetry={() => profile.refetch()}
       />
     );
   }

@@ -55,8 +55,7 @@ function useAsyncState<T>() {
       setState({ status: "success", data });
       return data;
     } catch (err) {
-      const error =
-        err instanceof ApiError ? err : new ApiError(String(err), 0);
+      const error = err instanceof ApiError ? err : new ApiError(String(err), 0);
       setState({ status: "error", error });
       return undefined;
     }
@@ -104,9 +103,7 @@ export function useCategoryFilter(initial: string[] = []) {
   }, []);
 
   const toggle = useCallback((slug: string) => {
-    setSelected((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
-    );
+    setSelected((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
   }, []);
 
   const clear = useCallback(() => setSelected([]), []);
@@ -157,7 +154,6 @@ export function useProductPreview(id: number | undefined) {
       if (id === undefined) return Promise.resolve(undefined);
       return run(() => getProductById(id, { select: PRODUCT_PREVIEW_SELECT, forceRefresh }));
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [run, id],
   );
 
@@ -203,7 +199,6 @@ export function useLowStockProducts(threshold: number, order: "asc" | "desc" = "
 
   const refetch = useCallback(
     (forceRefresh = false) => run(() => getAllProductStockLevels({ order, forceRefresh })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [run, order],
   );
 
@@ -214,10 +209,7 @@ export function useLowStockProducts(threshold: number, order: "asc" | "desc" = "
 
   // Filtering by threshold is a cheap client-side pass over already-cached,
   // already-sorted data — no extra network call per threshold change.
-  const lowStock =
-    state.status === "success"
-      ? state.data.filter((p) => p.stock < threshold)
-      : [];
+  const lowStock = state.status === "success" ? state.data.filter((p) => p.stock < threshold) : [];
 
   return { ...state, lowStock, refetch };
 }
@@ -375,10 +367,13 @@ export function useAuthEvent<K extends Parameters<typeof authEvents.on>[0]>(
   handler: (payload: Parameters<Parameters<typeof authEvents.on>[1]>[0]) => void,
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
 
   useEffect(() => {
-    // @ts-expect- error — payload type is narrowed by K at the call site;
+    handlerRef.current = handler;
+  }, [handler]);
+
+  useEffect(() => {
+    // @ts-expect -error — payload type is narrowed by K at the call site;
     // this indirection just avoids re-subscribing on every render.
     return authEvents.on(event, (payload) => handlerRef.current(payload));
   }, [event]);

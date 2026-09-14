@@ -348,7 +348,9 @@ html.dark .sidenav {
   font-size: 14px;
   font-weight: 500;
   color: var(--ink-soft);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .sidenav__link:hover {
@@ -625,7 +627,9 @@ html.dark .dash-table__value--ok {
   justify-content: center;
   border-radius: 6px;
   color: var(--ink-soft);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .dash-table__edit:hover {
@@ -710,7 +714,9 @@ html.dark .dash-table__edit:hover {
   border-radius: 8px;
   background: var(--paper);
   text-align: left;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .product-card:hover {
@@ -933,7 +939,10 @@ html.dark .product-info__stock--ok {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .discount-badge:hover {
@@ -1011,7 +1020,9 @@ html.dark .product-tabs {
   font-size: 18px;
   font-weight: 700;
   color: rgb(74 82 80 / 0.5);
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 html.dark .product-tabs__tab {
@@ -1210,7 +1221,9 @@ html.dark .preview-panel__eyebrow {
   justify-content: center;
   border-radius: 6px;
   color: var(--ink-soft);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .preview-panel__close:hover {
@@ -1369,7 +1382,10 @@ html.dark .avatar {
   justify-content: center;
   border-radius: 6px;
   font-weight: 500;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .btn:disabled {
@@ -1488,7 +1504,10 @@ html.dark .card {
   color: var(--ink-soft);
   font-size: 13px;
   font-weight: 500;
-  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .category-pill:hover {
@@ -1561,7 +1580,9 @@ html.dark .category-selector__label {
   justify-content: center;
   border-radius: 6px;
   color: var(--ink-soft);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .category-selector__toggle:hover {
@@ -1658,6 +1679,79 @@ html.dark .empty-state__title {
 }
 
 html.dark .empty-state__desc {
+  color: rgb(245 246 244 / 0.6);
+}
+
+.error-state__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.error-state__report {
+  display: flex;
+  width: 100%;
+  max-width: 460px;
+  margin: -28px auto 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+}
+
+html.dark .error-state__report {
+  background: var(--surface-dark);
+}
+
+.error-state__report-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--clinic-red);
+}
+
+.error-state__report-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.error-state__report-meta div {
+  display: flex;
+  gap: 8px;
+}
+
+.error-state__report-meta dt {
+  flex: 0 0 96px;
+  color: var(--ink-soft);
+}
+
+.error-state__report-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+html.dark .error-state__report-meta dd {
+  color: rgb(245 246 244 / 0.85);
+}
+
+.error-state__report-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+html.dark .error-state__report-hint {
   color: rgb(245 246 244 / 0.6);
 }
 
@@ -1890,7 +1984,9 @@ html.dark .stat-card__label {
   border: 1px solid var(--line);
   border-radius: 9999px;
   background: var(--surface);
-  transition: background-color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
 }
 
 html.dark .theme-toggle {
@@ -2126,7 +2222,9 @@ html.dark .modal__head {
   justify-content: center;
   border-radius: 6px;
   color: var(--ink-soft);
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .modal__close:hover {
@@ -2213,7 +2311,9 @@ html.dark .form-error {
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 html.dark .textarea {

@@ -113,9 +113,7 @@ export function ProductFormModal({ product, onClose, onSaved }: ProductFormModal
           />
         </div>
 
-        {mutations.status === "error" && (
-          <p className="form-error">{mutations.error.message}</p>
-        )}
+        {mutations.status === "error" && <p className="form-error">{mutations.error.message}</p>}
 
         <div className="modal__actions">
           <Button
