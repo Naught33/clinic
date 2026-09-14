@@ -26,5 +26,8 @@ jobs:
       - name: Format check (Prettier)
         run: npm run format:check
 
+      - name: Test (Vitest)
+        run: npm run test
+
       - name: Build (tsc + vite)
         run: npm run build

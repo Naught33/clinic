@@ -323,9 +323,48 @@ Error handling is deliberate: graceful fallbacks keep working (storage unavailab
 
 ---
 
+## Testing
+
+All automated tests live in `src/lib/client.test.ts`, targeting the data layer — the stable, React-free core where caching, auth, query building, and merge logic live. This is the layer where a regression actually breaks the user's session or search results.
+
+**Tooling:** Vitest 5 (Vite-native runner) + jsdom (real `sessionStorage`/`localStorage`) + `@vitest/coverage-v8`. HTTP is exercised via a stubbed global `fetch`; fake timers verify TTL expiry and session-manager intervals. No React component tests yet (would need `@testing-library/react`) — the data layer is pinned first because it carries the highest risk per line.
+
+```bash
+npm run test            # one-shot run
+npm run test:watch      # reruns on change
+npm run test:coverage   # coverage report (text + HTML in coverage/)
+```
+
+### What the 19 tests cover
+
+| Suite                    | Tests | What it pins down                                                                                                                                                                                       |
+| ------------------------ | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| product list fetching    |     5 | Query-string construction (undefined/empty dropped), search routes to `/products/search`, cache hit on repeated calls, different params = different entries, TTL expiry triggers re-fetch (fake timers) |
+| multi-category filtering |     2 | Per-slug caching (fetch each slug once, serve later combos from cache), client-side merge / dedupe / sort / pagination                                                                                  |
+| product detail caching   |     2 | Cache key includes id + selected fields (preview vs. full detail don't collide), `forceRefresh` bypasses cache                                                                                          |
+| mutations & invalidation |     2 | PUT with stock payload (stock-correction flow), list cache cleared after mutation → re-fetches                                                                                                          |
+| stock levels             |     1 | Lean stock snapshot reused from cache for the dashboard                                                                                                                                                 |
+| auth                     |     4 | Login success (tokens stored, `auth:login` emitted), bad credentials → `ApiError`, network failure wrapped as `ApiError(status:0)`, logout clears tokens + caches + emits `auth:logout`                 |
+| session snapshot         |     1 | `saveSessionSnapshot` / `getSessionSnapshot` / `clearSessionSnapshot` round-trip via real `sessionStorage`                                                                                              |
+| session manager          |     1 | Refresh failure emits `auth:refresh-failed` (fake timers + mocked 401)                                                                                                                                  |
+| categories               |     1 | Fetch once → memoized, re-fetch only after `clearAll`                                                                                                                                                   |
+
+### CI pipeline
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push/PR to `dev` or `main`:
+
+```
+install → lint → format:check → test → build
+         ESLint   Prettier     Vitest  tsc + vite
+```
+
+All four must pass. To make tests a hard gate before merge to main, enable branch protection on `main` and require the **`ci`** status check.
+
+---
+
 ## Decision Log
 
-The four decisions below are the architectural convictions behind this project, preserved verbatim, expanded here with how the code realizes them.
+The five decisions below are the architectural convictions behind this project, preserved verbatim, expanded here with how the code realizes them.
 
 ### 1. React bundled with Vite (not Next.js)
 
@@ -379,3 +418,14 @@ How it's realized:
   - applied filters → `categories`, `sortBy`, `order`
 - `ProtectedRoutes` is the boundary that keeps them: on `!isAuthenticated` it writes `saveSessionSnapshot({ path: location.pathname + location.search })` (the compact stand-in for the four fields — the query string _is_ them), then redirects to `/auth`. The snapshot lives in `sessionStorage`, so the full navigation to the login screen — state teardown included — leaves it untouched.
 - After re-authentication, `Auth.tsx` reads the snapshot, clears it (one-shot resume), and navigates to the exact saved path — `navigate(snapshot?.path ?? location.state?.from ?? "/dashboard")`. Same search, same filters, same sort, same page, or the same open product. Nothing lost.
+
+### 5. Stock-count threshold filter on the dashboard
+
+> The dashboard filter was added for inventory management: help identify stock running low and order the table from least available to least at risk of running out, since that's the main theme of the app. The DummyJSON API had a limitation where it could not filter by stock size, so a manual client-side implementation was added.
+
+How it's realized:
+
+- `useLowStockProducts(threshold, order)` (`src/lib/hooks.ts`) calls `getAllProductStockLevels()` — a single `GET /products?limit=0` that pulls the full 194-item product list with only `id`, `title`, and `stock` fields, sorted by stock via the API. The response is cached for the list TTL, so switching the threshold never triggers a network call.
+- The threshold filter (`stock < threshold`) runs client-side over the already-fetched, already-sorted array: `state.data.filter((p) => p.stock < threshold)`. Changing from `<10` to `<50` costs nothing — it's a cheap in-memory filter over a cached array. Code: `useLowStockProducts` in `src/lib/hooks.ts`.
+- The dashboard reads `threshold` and `order` from the URL query string (`/dashboard?threshold=20&order=desc`), so any given stock view can be shared, reloaded, or restored after a session expiry — same as every other screen.
+- The UI presents a `<Select>` with predefined thresholds (`10 / 20 / 50 / 100`), a sort order toggle (ascending by default, so lowest stock is always on top), and a per-row edit button (`StockEditModal`) that issues `PUT /products/{id}` with the new count.
