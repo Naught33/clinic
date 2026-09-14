@@ -16,7 +16,13 @@ export function ProtectedRoutes() {
 
   if (!isAuthenticated) {
     saveSessionSnapshot({ page: undefined });
-    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to="/auth"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    );
   }
 
   return <Outlet />;

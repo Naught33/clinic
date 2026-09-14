@@ -111,7 +111,9 @@ export function useCategoryFilter(initial: string[] = []) {
 
   const clear = useCallback(() => setSelected([]), []);
 
-  return { selected, add, remove, toggle, clear };
+  const replace = useCallback((next: string[]) => setSelected(next), []);
+
+  return { selected, add, remove, toggle, clear, replace };
 }
 
 // ============================================================================
@@ -244,6 +246,28 @@ export function useProductMutations() {
   );
 
   return { ...state, create, update, remove };
+}
+
+// ============================================================================
+// Profile — current user via /auth/me
+// ============================================================================
+
+export function useProfile(refetchOnMount = true) {
+  const [state, run] = useAsyncState<User>();
+
+  const refetch = useCallback(() => {
+    if (!checkIsAuthenticated()) {
+      return Promise.resolve(undefined);
+    }
+    return run(() => getCurrentUser());
+  }, [run]);
+
+  useEffect(() => {
+    if (refetchOnMount) refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refetchOnMount]);
+
+  return { ...state, refetch };
 }
 
 // ============================================================================

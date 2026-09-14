@@ -1,22 +1,41 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import { useProduct } from "../lib/hooks";
+import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useProduct, useProductMutations } from "../lib/hooks";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { PageSpinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
+import { ProductSkeleton } from "../components/ui/Skeleton";
+import { ProductFormModal } from "../components/ProductFormModal";
+import { ConfirmModal } from "../components/ui/Confirm";
+import { useToast } from "../components/ui/Toast";
 
 type Tab = "info" | "reviews";
 
 export default function Product() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const product = useProduct(id ? Number(id) : undefined);
-  const [tab, setTab] = useState<Tab>("info");
+  const mutations = useProductMutations();
+  const { success, error } = useToast();
+
+  const tab: Tab = searchParams.get("tab") === "reviews" ? "reviews" : "info";
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [discountOn, setDiscountOn] = useState(false);
+
+  function handleTabChange(next: Tab) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === "info") nextParams.delete("tab");
+    else nextParams.set("tab", "reviews");
+    if (nextParams.toString() !== searchParams.toString()) {
+      setSearchParams(nextParams, { preventScrollReset: true });
+    }
+  }
 
   if (product.status === "loading" || product.status === "idle") {
-    return <PageSpinner label="Loading product" />;
+    return <ProductSkeleton />;
   }
 
   if (product.status === "error") {
@@ -35,6 +54,25 @@ export default function Product() {
   }
 
   const p = product.data;
+
+  const discount = p.discountPercentage ?? 0;
+  const discountActive = discountOn && discount > 0 && p.price != null;
+  const finalPrice = discountActive && p.price != null ? p.price * (1 - discount / 100) : p.price;
+
+  async function handleDelete() {
+    const ok = await mutations.remove(p.id);
+    if (ok) {
+      success("Product deleted", `${p.title} has been removed.`);
+      navigate("/products");
+    } else {
+      setConfirmingDelete(false);
+      error(
+        "Couldn't delete product",
+        mutations.status === "error" ? mutations.error.message : "Something went wrong.",
+      );
+    }
+  }
+
   const infoRows: [string, string][] = [
     ["Brand", p.brand ?? "—"],
     ["Category", p.category ?? "—"],
@@ -56,14 +94,20 @@ export default function Product() {
   return (
     <Card className="product-detail">
       <div className="product-detail__back-row">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="back-link"
-        >
+        <button type="button" onClick={() => navigate(-1)} className="back-link">
           <Icon name="arrow-left" size={14} />
           Back
         </button>
+        <div className="product-detail__actions">
+          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            <Icon name="edit" size={13} />
+            Edit
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => setConfirmingDelete(true)}>
+            <Icon name="trash" size={13} />
+            Delete
+          </Button>
+        </div>
       </div>
 
       <div className="product-layout">
@@ -81,7 +125,15 @@ export default function Product() {
 
         <div className="product-info">
           <h1 className="product-info__title">{p.title}</h1>
-          <p className="product-info__price">$ {p.price?.toFixed(2) ?? "—"}</p>
+          <p className="product-info__price">
+            $ {finalPrice?.toFixed(2) ?? "—"}
+            {discountActive && (
+              <span className="price-compare">
+                <del>$ {p.price?.toFixed(2)}</del>
+                <span className="price-compare__save">-{discount.toFixed()}%</span>
+              </span>
+            )}
+          </p>
           <p className="product-info__desc">{p.description}</p>
           <p
             className={`product-info__stock ${
@@ -91,12 +143,18 @@ export default function Product() {
             {p.stock} Items left
           </p>
 
-          {!!p.discountPercentage && (
-            <span className="discount-badge">
+          {p.discountPercentage ? (
+            <button
+              type="button"
+              aria-pressed={discountOn}
+              onClick={() => setDiscountOn((v) => !v)}
+              className={`discount-badge${discountOn ? " is-active" : ""}`}
+            >
+              <Icon name="check" size={12} className="discount-badge__check" />
               <Icon name="tag" size={13} />
               Apply {p.discountPercentage.toFixed(2)}% Discount
-            </span>
-          )}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -105,7 +163,7 @@ export default function Product() {
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => handleTabChange(t)}
             className={`product-tabs__tab${tab === t ? " is-active" : ""}`}
           >
             {t === "info" ? "Product Information" : "Reviews"}
@@ -141,9 +199,7 @@ export default function Product() {
               <li key={i} className="review">
                 <div className="review__head">
                   <p className="review__name">{review.reviewerName}</p>
-                  <span className="review__date">
-                    {new Date(review.date).toLocaleDateString()}
-                  </span>
+                  <span className="review__date">{new Date(review.date).toLocaleDateString()}</span>
                 </div>
                 <div className="review__stars">
                   {Array.from({ length: 5 }).map((_, idx) => (
@@ -165,6 +221,35 @@ export default function Product() {
           </div>
         )}
       </div>
+
+      {editing && (
+        <ProductFormModal
+          product={p}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            success("Product updated", `${p.title} has been saved.`);
+            setEditing(false);
+            product.refetch(true);
+          }}
+        />
+      )}
+
+      {confirmingDelete && (
+        <ConfirmModal
+          title="Delete product"
+          message={
+            <>
+              Are you sure you want to delete <strong>{p.title}</strong>? This action cannot be
+              undone.
+            </>
+          }
+          confirmLabel="Delete product"
+          dangerous
+          loading={mutations.status === "loading"}
+          onClose={() => setConfirmingDelete(false)}
+          onConfirm={handleDelete}
+        />
+      )}
     </Card>
   );
 }

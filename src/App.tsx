@@ -9,6 +9,7 @@ import Auth from "./routes/Auth";
 import Dashboard from "./routes/Dashboard";
 import Products from "./routes/Products";
 import Product from "./routes/Product";
+import Profile from "./routes/Profile";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/products" element={<Products />} />
                   <Route path="/products/:id" element={<Product />} />
+                  <Route path="/profile" element={<Profile />} />
                 </Route>
               </Route>
               <Route path="*" element={<Index />} />

@@ -1,40 +1,111 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
-import { useCategories, useCategoryFilter, useProducts } from "../lib/hooks";
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { useCategories, useProducts } from "../lib/hooks";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
+import { Select } from "../components/ui/Select";
 import { CategorySelector } from "../components/ui/CategoryPill";
 import { Card } from "../components/ui/Card";
 import { Pagination } from "../components/ui/Pagination";
-import { PageSpinner } from "../components/ui/Spinner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
+import { GridSkeleton } from "../components/ui/Skeleton";
 import { ProductModal } from "../components/ProductModal";
 
 const PAGE_SIZE = 10;
+const SEARCH_DELAY = 350;
 
+type SortBy = "" | "title" | "price" | "stock";
+type Order = "asc" | "desc";
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * The whole page state lives in the URL query string so a filtered/paginated
+ * result set can be shared, reloaded, or restored after a session expiry:
+ *
+ *   /products?q=vit&categories=beauty,skin-care&sortBy=price&order=asc&page=2
+ *
+ * The URL is the single source of truth for everything except the search
+ * text box, which stays local so typing is instant (it commits to the URL
+ * after a short debounce).
+ */
 export default function Products() {
   const categories = useCategories();
-  const categoryFilter = useCategoryFilter();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [searchInput, setSearchInput] = useState("");
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const urlQuery = searchParams.get("q") ?? "";
+  const urlCategories = (searchParams.get("categories") ?? "").split(",").filter(Boolean);
+  const page = parsePositiveInt(searchParams.get("page"), 1);
+  const sortBy: SortBy = (searchParams.get("sortBy") ?? "") as SortBy;
+  const order: Order = searchParams.get("order") === "desc" ? "desc" : "asc";
+
+  const [searchInput, setSearchInput] = useState(urlQuery);
   const [previewId, setPreviewId] = useState<number | undefined>(undefined);
 
-  const products = useProducts({
-    q: query || undefined,
-    categories: categoryFilter.selected.length ? categoryFilter.selected : undefined,
-    limit: PAGE_SIZE,
-    skip: (page - 1) * PAGE_SIZE,
-  });
+  // Back/forward: resync the text box with the committed URL term.
+  const [prevUrlQuery, setPrevUrlQuery] = useState(urlQuery);
+  if (prevUrlQuery !== urlQuery) {
+    setPrevUrlQuery(urlQuery);
+    setSearchInput(urlQuery);
+  }
+
+  function updateParams(patch: Record<string, string | number | undefined>, opts?: { replace?: boolean }) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined || value === "") next.delete(key);
+      else next.set(key, String(value));
+    }
+    if (next.toString() === searchParams.toString()) return;
+    setSearchParams(next, { preventScrollReset: true, replace: opts?.replace });
+  }
+
+  // Debounced as-you-type search: commit the term (and reset page) to URL.
+  // `replace` keeps intermediate keystrokes out of browser history.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      updateParams({ q: searchInput.trim() || undefined, page: 1 }, { replace: true });
+    }, SEARCH_DELAY);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
-    setQuery(searchInput.trim());
-    setPage(1);
+    updateParams({ q: searchInput.trim() || undefined, page: 1 });
   }
+
+  function handleToggleCategory(slug: string) {
+    const next = urlCategories.includes(slug)
+      ? urlCategories.filter((s) => s !== slug)
+      : [...urlCategories, slug];
+    updateParams({ categories: next.join(",") || undefined, page: 1 });
+  }
+
+  function handleClearCategories() {
+    updateParams({ categories: undefined, page: 1 });
+  }
+
+  function handleSortChange(nextSortBy: SortBy, nextOrder: Order) {
+    updateParams({
+      sortBy: nextSortBy || undefined,
+      order: nextSortBy ? nextOrder : undefined,
+      page: 1,
+    });
+  }
+
+  const products = useProducts({
+    q: urlQuery || undefined,
+    categories: urlCategories.length ? urlCategories : undefined,
+    sortBy: sortBy || undefined,
+    order,
+    limit: PAGE_SIZE,
+    skip: (page - 1) * PAGE_SIZE,
+  });
 
   const list = products.status === "success" ? products.data.products : [];
   const total = products.status === "success" ? products.data.total : 0;
@@ -55,25 +126,41 @@ export default function Products() {
           </Button>
         </form>
 
+        <div className="products__sort">
+          <Select
+            value={sortBy}
+            onChange={(e) => handleSortChange(e.target.value as SortBy, order)}
+            aria-label="Sort by"
+          >
+            <option value="">Default</option>
+            <option value="title">Title</option>
+            <option value="price">Price</option>
+            <option value="stock">Stock</option>
+          </Select>
+          <Select
+            value={order}
+            onChange={(e) => handleSortChange(sortBy, e.target.value as Order)}
+            aria-label="Order"
+            disabled={!sortBy}
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </Select>
+        </div>
+
         <Card className="products__filter">
           {categories.status === "success" && (
             <CategorySelector
               categories={categories.data}
-              selected={categoryFilter.selected}
-              onToggle={(slug) => {
-                categoryFilter.toggle(slug);
-                setPage(1);
-              }}
-              onClear={() => {
-                categoryFilter.clear();
-                setPage(1);
-              }}
+              selected={urlCategories}
+              onToggle={handleToggleCategory}
+              onClear={handleClearCategories}
             />
           )}
         </Card>
 
         {products.status === "loading" || products.status === "idle" ? (
-          <PageSpinner label="Loading products" />
+          <GridSkeleton count={8} />
         ) : products.status === "error" ? (
           <EmptyState
             icon="alert"
@@ -114,8 +201,8 @@ export default function Products() {
             <Pagination
               page={page}
               totalPages={totalPages}
-              onPrev={() => setPage((n) => Math.max(1, n - 1))}
-              onNext={() => setPage((n) => Math.min(totalPages, n + 1))}
+              onPrev={() => updateParams({ page: Math.max(1, page - 1) })}
+              onNext={() => updateParams({ page: Math.min(totalPages, page + 1) })}
             />
           </>
         )}

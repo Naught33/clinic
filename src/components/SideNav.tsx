@@ -6,6 +6,7 @@ import { useToast } from "./ui/Toast";
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: "dashboard" as const },
   { to: "/products", label: "Products", icon: "store" as const },
+  { to: "/profile", label: "Profile", icon: "user" as const },
 ];
 
 export function SideNav() {
