@@ -53,14 +53,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const success = useCallback(
-    (title: string, description?: string) =>
-      notify({ variant: "success", title, description }),
+    (title: string, description?: string) => notify({ variant: "success", title, description }),
     [notify],
   );
 
   const error = useCallback(
-    (title: string, description?: string) =>
-      notify({ variant: "error", title, description }),
+    (title: string, description?: string) => notify({ variant: "error", title, description }),
     [notify],
   );
 

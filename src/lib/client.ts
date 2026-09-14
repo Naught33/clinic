@@ -30,6 +30,14 @@ const BASE_URL = "https://dummyjson.com";
  */
 const DEBUG_AUTH = import.meta.env.VITE_DEBUG_AUTH === "true";
 
+/**
+ * Set VITE_DEBUG_REQUEST_DELAY=true to artificially slow product-list
+ * requests (see the `delay` param on ProductListParams). Fires
+ * `debug:request-delay` so the UI can surface it as a toast while we
+ * monitor the skeleton/loading UX.
+ */
+const DEBUG_REQUEST_DELAY = import.meta.env.VITE_DEBUG_REQUEST_DELAY === "true";
+
 /** Consecutive inactive refresh cycles allowed before we force logout. */
 const MAX_INACTIVITY_STRIKES = 5;
 
@@ -183,9 +191,7 @@ export interface ProductListParams {
   forceRefresh?: boolean;
 }
 
-export type ProductWritePayload = Partial<
-  Omit<Product, "id" | "meta" | "reviews">
->;
+export type ProductWritePayload = Partial<Omit<Product, "id" | "meta" | "reviews">>;
 
 /** Discriminated union every hook resolves to — UI switches on `.status`. */
 export type AsyncState<T> =
@@ -210,8 +216,17 @@ export class ApiError extends Error {
  * The four fields Decision Log #4 wants preserved across a forced
  * re-login mid-session. UI (AuthContext) reads/writes this around
  * the redirect — this file just provides the storage.
+ *
+ * `path` is the canonical form: the page's own URL state (search term,
+ * page number, open-product preview, applied filters) is already encoded
+ * in the query string (see Products.tsx/Dashboard.tsx), so capturing the
+ * full `pathname + search` restores the user to an identical screen.
+ * The decomposed fields below remain available for consumers that need
+ * a single value (e.g. a "resume at page 3" button) without reparsing.
  */
 export interface SessionSnapshot {
+  /** Full pathname + search, e.g. "/products?q=vit&categories=beauty&page=2&preview=19". */
+  path?: string;
   searchTerm?: string;
   page?: number;
   openProductId?: number;
@@ -222,15 +237,22 @@ export interface SessionSnapshot {
 // Tiny pub/sub for auth events
 // ============================================================================
 
+// Object literals with string keys are used both as mappings and as generic
+// emit maps — type aliases (not interfaces) satisfy `Record<string, unknown>`,
+// which `createEmitter` requires, so interfaces can't be substituted here.
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
 type AuthEventMap = {
   "auth:login": { user: User };
   "auth:logout": undefined;
   "auth:refreshed": { tokens: AuthTokens };
   "auth:debug-refresh": { message: string };
   "auth:session-expired": undefined;
+  "auth:refresh-failed": { message: string; status: number };
 };
 
-type Listener<T> = (payload: T) => void;
+interface Listener<T> {
+  (payload: T): void;
+}
 
 function createEmitter<Events extends Record<string, unknown>>() {
   const listeners = new Map<keyof Events, Set<Listener<unknown>>>();
@@ -253,6 +275,13 @@ function createEmitter<Events extends Record<string, unknown>>() {
 /** Subscribe from hooks.ts / UI: `authEvents.on("auth:session-expired", () => ...)` */
 export const authEvents = createEmitter<AuthEventMap>();
 
+/** Debug/diagnostic channel — e.g. when debug slow-mo delays a request. */
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+type DebugEventMap = {
+  "debug:request-delay": { message: string };
+};
+export const debugEvents = createEmitter<DebugEventMap>();
+
 // ============================================================================
 // Storage helpers (guarded — safe to import in any environment)
 // ============================================================================
@@ -260,7 +289,8 @@ export const authEvents = createEmitter<AuthEventMap>();
 function safeGet(storage: Storage, key: string): string | null {
   try {
     return storage.getItem(key);
-  } catch {
+  } catch (err) {
+    console.warn(`[storage] read failed for "${key}"`, err);
     return null;
   }
 }
@@ -268,16 +298,20 @@ function safeGet(storage: Storage, key: string): string | null {
 function safeSet(storage: Storage, key: string, value: string): void {
   try {
     storage.setItem(key, value);
-  } catch {
-    /* storage unavailable or full — non-fatal */
+  } catch (err) {
+    /* storage unavailable or full — fall back to not persisting, but don't
+       fail silently: tokens/snapshots that can't be written degrade the session. */
+    console.warn(`[storage] write failed for "${key}"`, err);
   }
 }
 
 function safeRemove(storage: Storage, key: string): void {
   try {
     storage.removeItem(key);
-  } catch {
-    /* no-op */
+  } catch (err) {
+    /* no-op — but log it so a stuck value (e.g. a stale snapshot keeping a
+       user pinned to a dead page) isn't invisible. */
+    console.warn(`[storage] remove failed for "${key}"`, err);
   }
 }
 
@@ -409,6 +443,24 @@ function buildQueryString(params: Record<string, unknown>): string {
 }
 
 // ============================================================================
+// Debug slow-mo — artificial latency gated by VITE_DEBUG_REQUEST_DELAY.
+// Sleeping keeps the native clock ticking; emitting lets the UI toast it.
+// ============================================================================
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function appliedDebugDelay(ms: number): Promise<void> {
+  if (!DEBUG_REQUEST_DELAY || ms <= 0) return Promise.resolve();
+  return sleep(ms).then(() => {
+    debugEvents.emit("debug:request-delay", {
+      message: `Debug slow-mo: this product request was slowed by ${ms}ms.`,
+    });
+  });
+}
+
+// ============================================================================
 // Core request wrapper
 // ============================================================================
 
@@ -442,10 +494,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       credentials: "include",
     });
   } catch (err) {
-    throw new ApiError(
-      err instanceof Error ? err.message : "Network request failed",
-      0,
-    );
+    throw new ApiError(err instanceof Error ? err.message : "Network request failed", 0);
   }
 
   let body: unknown = null;
@@ -459,8 +508,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!res.ok) {
-    const message =
-      (body as { message?: string } | null)?.message ?? res.statusText;
+    const message = (body as { message?: string } | null)?.message ?? res.statusText;
     throw new ApiError(message, res.status, body);
   }
 
@@ -511,7 +559,11 @@ async function refreshSession(): Promise<AuthTokens | null> {
       });
     }
     return tokens;
-  } catch {
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0;
+    const message = err instanceof ApiError ? err.message : "Session refresh failed";
+    console.warn(`[auth] session refresh failed (${status}): ${message}`);
+    authEvents.emit("auth:refresh-failed", { message, status });
     return null;
   }
 }
@@ -619,7 +671,13 @@ function productListCacheKey(path: string, qs: string): string {
  * once per cache TTL, regardless of which other categories are active
  * alongside it.
  */
-async function getCategoryProducts(slug: string, forceRefresh = false): Promise<Product[]> {
+async function getCategoryProducts(
+  slug: string,
+  forceRefresh = false,
+  delay?: number,
+): Promise<Product[]> {
+  await appliedDebugDelay(delay ?? 0);
+
   if (!forceRefresh) {
     const cached = categoryProductCache.get(slug);
     if (cached) return cached;
@@ -647,10 +705,10 @@ async function getCategoryProducts(slug: string, forceRefresh = false): Promise<
  */
 async function getProductsForCategories(
   slugs: string[],
-  params: Pick<ProductListParams, "sortBy" | "order" | "limit" | "skip" | "forceRefresh">,
+  params: Pick<ProductListParams, "sortBy" | "order" | "limit" | "skip" | "forceRefresh" | "delay">,
 ): Promise<ProductListResult> {
   const perCategory = await Promise.all(
-    slugs.map((slug) => getCategoryProducts(slug, params.forceRefresh)),
+    slugs.map((slug) => getCategoryProducts(slug, params.forceRefresh, params.delay)),
   );
 
   // Dedup by id (defensive — a product should only ever belong to one
@@ -682,7 +740,8 @@ async function getProductsForCategories(
 }
 
 export async function getProducts(params: ProductListParams = {}): Promise<ProductListResult> {
-  const { q, category, categories, forceRefresh, sortBy, order, limit, skip, ...rest } = params;
+  const { q, category, categories, forceRefresh, sortBy, order, limit, skip, delay, ...rest } =
+    params;
 
   const activeCategories = categories?.length ? categories : category ? [category] : [];
 
@@ -693,8 +752,11 @@ export async function getProducts(params: ProductListParams = {}): Promise<Produ
       limit,
       skip,
       forceRefresh,
+      delay,
     });
   }
+
+  await appliedDebugDelay(delay ?? 0);
 
   const path = q ? "/products/search" : "/products";
 

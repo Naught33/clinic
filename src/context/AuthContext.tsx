@@ -1,9 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import {
-  useAuthSession,
-  useActivityTracker,
-  useAuthEvent,
-} from "../lib/hooks";
+import { useAuthSession, useActivityTracker, useAuthEvent } from "../lib/hooks";
 import type { User, LoginPayload, ApiError } from "../lib/client";
 import { useToast } from "../components/ui/Toast";
 
@@ -34,6 +30,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useAuthEvent("auth:debug-refresh", (payload) => {
     const message = (payload as { message?: string } | undefined)?.message;
     notify({ variant: "info", title: "Session refreshed", description: message });
+  });
+
+  useAuthEvent("auth:refresh-failed", (payload) => {
+    const { message, status } =
+      (payload as { message?: string; status?: number } | undefined) ?? {};
+    notify({
+      variant: "info",
+      title: "Session refresh failed",
+      description:
+        `We couldn't refresh your session (${status ?? "network"}). ` +
+        `You'll be signed in until the current token expires. ${message ?? ""}`.trim(),
+    });
   });
 
   return (

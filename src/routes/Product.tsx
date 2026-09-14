@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useProduct, useProductMutations } from "../lib/hooks";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { ErrorState } from "../components/ui/ErrorState";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Icon } from "../components/ui/Icon";
 import { ProductSkeleton } from "../components/ui/Skeleton";
@@ -40,12 +41,13 @@ export default function Product() {
 
   if (product.status === "error") {
     return (
-      <EmptyState
-        icon="alert"
+      <ErrorState
         title="Couldn't load this product"
-        description={product.error.message}
-        action={
-          <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+        code={product.error.status}
+        message={product.error.message}
+        onRetry={() => product.refetch(true)}
+        secondaryAction={
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             Go back
           </Button>
         }
@@ -113,11 +115,7 @@ export default function Product() {
       <div className="product-layout">
         <div className="product-image">
           {p.thumbnail || p.images?.[0] ? (
-            <img
-              src={p.thumbnail ?? p.images?.[0]}
-              alt={p.title}
-              className="product-image__img"
-            />
+            <img src={p.thumbnail ?? p.images?.[0]} alt={p.title} className="product-image__img" />
           ) : (
             <Icon name="image" size={36} />
           )}

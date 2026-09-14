@@ -15,14 +15,8 @@ export function ProtectedRoutes() {
   if (isLoading) return <PageSpinner label="Checking your session" />;
 
   if (!isAuthenticated) {
-    saveSessionSnapshot({ page: undefined });
-    return (
-      <Navigate
-        to="/auth"
-        replace
-        state={{ from: location.pathname + location.search }}
-      />
-    );
+    saveSessionSnapshot({ path: location.pathname + location.search });
+    return <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   }
 
   return <Outlet />;

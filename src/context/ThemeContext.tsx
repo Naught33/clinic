@@ -24,13 +24,11 @@ function getInitialTheme(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
-  } catch {
-    /* storage unavailable */
+  } catch (err) {
+    console.warn("[theme] could not read stored theme — falling back to system preference", err);
   }
   if (typeof window !== "undefined" && window.matchMedia) {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   return "light";
 }
@@ -43,8 +41,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("dark", theme === "dark");
     try {
       localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      /* non-fatal */
+    } catch (err) {
+      console.warn("[theme] could not persist theme preference", err);
     }
   }, [theme]);
 
@@ -54,10 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const value = useMemo(
-    () => ({ theme, toggleTheme, setTheme }),
-    [theme, toggleTheme, setTheme],
-  );
+  const value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

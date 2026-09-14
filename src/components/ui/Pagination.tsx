@@ -10,12 +10,7 @@ interface PaginationProps {
 export function Pagination({ page, totalPages, onPrev, onNext }: PaginationProps) {
   return (
     <div className="pagination">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={page <= 1}
-        className="pagination__btn"
-      >
+      <button type="button" onClick={onPrev} disabled={page <= 1} className="pagination__btn">
         <Icon name="chevron-left" size={14} />
         Prev
       </button>
